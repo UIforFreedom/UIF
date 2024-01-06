@@ -1,0 +1,80 @@
+name: Release
+
+on: [push]
+jobs:
+  setup_env:
+    name: Build and Release
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    permissions: write-all
+    if: startsWith(github.ref, 'refs/tags/') && contains(github.event.head_commit.message, 'auto update')
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-go@v4
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 19
+
+      - run: npm install --legacy-peer-deps
+
+      - name: Build Web
+        env:
+          NODE_OPTIONS: "--openssl-legacy-provider"
+        run: npm run build:stage
+
+      - uses: actions/setup-python@v4
+      - run: python ./release.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: cp -R ./dist/ ./uifd/web_dist/
+
+      - uses: goreleaser/goreleaser-action@v4
+        with:
+          install-only: true
+
+      - run: |
+          cd uifd/service/
+          goreleaser --snapshot --clean
+          cd ..
+          go build -o build ./build_service
+          ./build
+          goreleaser --skip-validate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update page
+        run: |
+          ls
+          cd dist
+          ls
+          git init
+          git config --global user.name 'UIF'
+          git config --global user.email 'UIF@uif.org'
+          git config --global init.defaultBranch 'master'
+          git add --all
+          git remote add origin https://${{ secrets.UIF_TOKEN }}@github.com/UIforFreedom/UIforFreedom.github.io.git
+          git commit -am "auto update"
+          git push origin master --force
+
+      - run: |
+          cd ./doc
+          npm install
+          npm run build
+          ls
+
+      - name: Update Doc
+        run: |
+          cd ./doc/build
+          ls
+          git init
+          git config --global user.name 'UIF'
+          git config --global user.email 'UIF@uif.org'
+          git config --global init.defaultBranch 'master'
+          git add --all
+          git remote add origin https://${{ secrets.UIF_TOKEN }}@github.com/UIforFreedom/UIF_help.git
+          git commit -am "auto update"
+          git push origin master --force
