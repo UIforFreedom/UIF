@@ -1,0 +1,223 @@
+name: Release
+
+on: [push]
+jobs:
+  build_uif:
+    name: Build and Release
+    runs-on: windows-latest
+    permissions: write-all
+    if: startsWith(github.ref, 'refs/tags/') && contains(github.event.head_commit.message, 'auto update')
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v4
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "22.2.0"
+
+      - run: npm install --force
+
+      - name: Build Web
+        env:
+          NODE_OPTIONS: "--openssl-legacy-provider"
+        run: npm run build:stage
+
+      - uses: actions/setup-python@v4
+      - run: |
+          pip install requests
+          python ./release.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: cp -R ./dist/ ./uifd/web_dist/
+
+      - uses: goreleaser/goreleaser-action@v4
+        with:
+          install-only: true
+          version: "v1.26.2"
+
+      - run: |
+          cd uifd/service/
+          goreleaser --snapshot --clean
+          cd ..
+          go build -o build.exe ./build_service
+          ./build.exe
+          ls
+          goreleaser --skip-validate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # build setup.exe
+      - name: Download GitHub CLI
+        run: |
+          Invoke-WebRequest -Uri https://github.com/cli/cli/releases/download/v2.34.0/gh_2.34.0_windows_amd64.msi -OutFile gh_cli.msi
+          Start-Process msiexec.exe -ArgumentList '/i gh_cli.msi /quiet /norestart' -Wait
+
+      - name: Get Latest Release Version
+        id: get_release_version
+        run: |
+          $LATEST_RELEASE = gh release view --json tagName --jq .tagName
+          echo "LATEST_RELEASE=$LATEST_RELEASE" >> $env:GITHUB_ENV
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download zip from Latest Release
+        run: |
+          cd uifd
+          gh release download $env:LATEST_RELEASE --pattern "uif-windows-amd64.zip" --dir "./saved/"
+          Expand-Archive -Path "./saved/uif-windows-amd64.zip" -DestinationPath "./saved/"
+          echo "true" > ./saved/uif-windows-amd64/useSimplified
+          echo $env:LATEST_RELEASE
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compile .ISS to .EXE Installer
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        with:
+          path: uifd/uif.iss
+
+      - name: Rename file
+        run: |
+          cd ./uifd/Output/
+          ren "setup.exe" "uif-windows-amd64-setup.exe"
+
+      - name: Upload setup.exe to release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: ./uifd/Output/uif-windows-amd64-setup.exe
+
+      - run: |
+          echo "ui4freedom.org" >> ./dist/CNAME
+          mkdir ./dist/releases/
+          cp ./uifd/dist/uif-* ./dist/releases/
+          cp ./uifd/dist/uif-* ./doc/static/assets/release/
+          cp ./uifd/Output/uif-* ./doc/static/assets/release/
+          cp ./uifd/ui4freedom* ./doc/static/assets/release/
+          cp ./uifd/uiforfreedom* ./doc/static/assets/release/
+          cp ./uifd/linux_install.sh ./doc/static/assets/release/
+
+      - name: Cache folder
+        uses: actions/cache@v3
+        with:
+          path: ./doc/static/assets/release/
+          key: release_cache
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: release_cache
+          path: ./doc/static/assets/release/
+
+      # build home page
+      - name: Update page
+        run: |
+          cd dist
+          ls
+          git init
+          git config --global user.name 'UIF'
+          git config --global user.email 'UIforFreedom@proton.me'
+          git config --global init.defaultBranch 'master'
+          git add --all
+          git remote add origin https://${{ secrets.UIF_TOKEN }}@github.com/UIforFreedom/UIforFreedom.github.io.git
+          git commit -am "auto update"
+          git push origin master --force
+
+  build_docker:
+    needs: [build_uif]
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          lfs: true # 确保 Git LFS 文件被检出
+
+      - name: Set up Git LFS
+        run: |
+          sudo apt-get install -y git-lfs
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ui4freedom
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./uifd
+          file: ./uifd/Dockerfile
+          push: true
+          tags: ui4freedom/uif:latest
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+
+      - name: Save Docker Images as Tar
+        run: |
+          cd ./doc/static/assets/release/
+          docker pull --platform linux/amd64 ui4freedom/uif:latest || true
+          docker save -o ./uif-docker-amd64.tar ui4freedom/uif:latest
+          filesize=$(stat -c %s uif-docker-amd64.tar)
+          partsize=$((filesize / 2))
+          split -b $partsize uif-docker-amd64.tar uif-docker-amd64-part_
+
+          docker pull --platform linux/arm64 ui4freedom/uif:latest || true
+          docker save -o ./uif-docker-arm64.tar ui4freedom/uif:latest
+          filesize=$(stat -c %s uif-docker-arm64.tar)
+          partsize=$((filesize / 2))
+          split -b $partsize uif-docker-arm64.tar uif-docker-arm64-part_
+
+          docker pull --platform linux/arm/v7 ui4freedom/uif:latest || true
+          docker save -o ./uif-docker-armv7.tar ui4freedom/uif:latest
+          filesize=$(stat -c %s uif-docker-armv7.tar)
+          partsize=$((filesize / 2))
+          split -b $partsize uif-docker-armv7.tar uif-docker-armv7-part_
+
+      - name: Upload docker to release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            ./doc/static/assets/release/uif-docker-arm64.tar
+            ./doc/static/assets/release/uif-docker-armv7.tar
+            ./doc/static/assets/release/uif-docker-amd64.tar
+      - run: |
+          rm ./doc/static/assets/release/uif-docker-arm64.tar
+          rm ./doc/static/assets/release/uif-docker-armv7.tar
+          rm ./doc/static/assets/release/uif-docker-amd64.tar
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "22.2.0"
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: release_cache
+          path: ./doc/static/assets/release/
+
+      # build doc
+      - run: |
+          cd ./doc
+          npm install
+          npm run build
+          ls
+      - name: Update Doc
+        run: |
+          cd ./doc/build
+          git init
+          # git lfs install
+          # git lfs track "*.mp4"
+          # git lfs track "*.tar"
+          git config --global user.name 'UIF'
+          git config --global user.email 'UIF@uif.org'
+          git config --global init.defaultBranch 'master'
+          git add --all
+          git remote add origin https://${{ secrets.UIF_TOKEN }}@github.com/UIforFreedom/UIF_help.git
+          git commit -am "auto update"
+          git push origin master --force
