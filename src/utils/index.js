@@ -392,7 +392,7 @@ export function MyPost(address, param) {
 
 export function MyWS(address, param, resolve, reject) {
   var url = new URL(address)
-  var wsURL = `ws://${url.host}${url.pathname}?key=${encodeURIComponent(GetKey())}`
+  var wsURL = `${url.protocol == 'https:' ? 'wss' : 'ws'}://${url.host}${url.pathname}?key=${encodeURIComponent(GetKey())}`
 
   const socket = new WebSocket(wsURL);
 
