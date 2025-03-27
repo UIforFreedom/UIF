@@ -1,0 +1,8 @@
+{
+  "label": "接管流量",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "description": "UIF 内置了两种接管方式，不同用户根据需求使用；接管了流量的同时，需要导入 代理服务器 后才能翻墙上网。"
+  }
+}
