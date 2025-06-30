@@ -1,0 +1,236 @@
+name: Release
+
+on: [push]
+jobs:
+  build_uif:
+    name: Build and Release
+    runs-on: macos-latest
+    permissions: write-all
+    if: startsWith(github.ref, 'refs/tags/') && contains(github.event.head_commit.message, 'auto update')
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "22.2.0"
+
+      - run: npm install --force
+
+      - name: Build Web
+        env:
+          NODE_OPTIONS: "--openssl-legacy-provider"
+        run: npm run build:stage
+
+      - name: Delete All Releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          releases=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases" | jq -r '.[].id')
+
+          for release_id in $releases; do
+            echo "Deleting release ID: $release_id"
+            curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/$release_id"
+          done
+
+      # 3. 删除所有 Tags
+      - name: Delete All Tags
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tags=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/git/refs/tags" | jq -r '.[].ref')
+
+          for tag in $tags; do
+            tag_name=$(echo $tag | sed 's|refs/tags/||')
+            echo "Deleting tag: $tag_name"
+            curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
+              "https://api.github.com/repos/${{ github.repository }}/git/refs/tags/$tag_name"
+          done
+
+      - run: cp -R ./dist/ ./uifd/web_dist/
+
+      - uses: goreleaser/goreleaser-action@v4
+        with:
+          install-only: true
+          version: "v1.26.2"
+
+      - run: |
+          cd uifd/service/
+          goreleaser --snapshot --clean
+          cd ..
+          go build -o build.exe ./build_service
+          ./build.exe
+          ls
+          goreleaser --skip-validate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: |
+          echo "ui4freedom.org" >> ./dist/CNAME
+          mkdir ./dist/releases/
+          cp ./uifd/dist/uif-* ./dist/releases/
+          cp ./uifd/dist/uif-* ./doc/static/assets/release/
+          cp ./uifd/ui4freedom* ./doc/static/assets/release/
+          cp ./uifd/uiforfreedom* ./doc/static/assets/release/
+          cp ./uifd/linux_install.sh ./doc/static/assets/release/
+          cp ./uifd/version/* ./doc/static/assets/release/version
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release_cache
+          path: ./doc/static/assets/release/
+
+      # buiild dmg
+      - run: |
+          mkdir ./dmg_temp/
+          tar -zxvf ./doc/static/assets/release/uif-darwin-arm64.tar.gz -C ./dmg_temp/
+          mv ./dmg_temp/uif-darwin-arm64/* ./UIF.app/Contents/MacOS/
+          npm install --global create-dmg
+          create-dmg UIF.app --identity=false
+        continue-on-error: true
+
+      - run: |
+          mv "./UIF 1.0.dmg" "./uif-darwin-arm64.dmg"
+
+      - name: Upload dmg to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./uif-darwin-arm64.dmg
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release_dmg
+          path: "./uif-darwin-arm64.dmg"
+
+      # build home page
+      - name: Update page
+        run: |
+          cd dist
+          ls
+          git init
+          git config --global user.name 'UIF'
+          git config --global user.email 'UIforFreedom@proton.me'
+          git config --global init.defaultBranch 'master'
+          git add --all
+          git remote add origin https://${{ secrets.UIF_TOKEN }}@github.com/UIforFreedom/UIforFreedom.github.io.git
+          git commit -am "auto update"
+          git push origin master --force
+
+  build_windows_setup:
+    needs: [build_uif]
+    name: Build Windows Setup
+    runs-on: windows-latest
+    permissions: write-all
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Download release
+        uses: actions/download-artifact@v4
+        with:
+          name: release_cache
+          path: ./uifd/saved/
+
+      - name: Download zip from Latest Release
+        run: |
+          cd uifd
+          Expand-Archive -Path "./saved/uif-windows-amd64.zip" -DestinationPath "./saved/"
+          echo "true" > ./saved/uif-windows-amd64/useSimplified
+
+      - name: Compile .ISS to .EXE Installer
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        with:
+          path: uifd/uif.iss
+
+      - name: Rename file
+        run: |
+          cd ./uifd/Output/
+          ren "setup.exe" "uif-windows-amd64-setup.exe"
+
+      - name: Upload setup.exe to release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: ./uifd/Output/uif-windows-amd64-setup.exe
+
+      - name: Upload setup artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release_setup
+          path: ./uifd/Output/uif-windows-amd64-setup.exe
+
+  build_docker:
+    needs: [build_windows_setup]
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ui4freedom
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./uifd
+          file: ./uifd/Dockerfile
+          push: true
+          tags: ui4freedom/uif:latest
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Download release
+        uses: actions/download-artifact@v4
+        with:
+          name: release_cache
+          path: ./doc/static/assets/release/
+
+      - name: Download dmg
+        uses: actions/download-artifact@v4
+        with:
+          name: release_dmg
+          path: ./doc/static/assets/release/
+
+      - name: Download setup
+        uses: actions/download-artifact@v4
+        with:
+          name: release_setup
+          path: ./doc/static/assets/release/
+
+      # build doc
+      - run: |
+          cd ./doc
+          npm install
+          npm run build
+          ls
+      - name: Update Doc
+        run: |
+          cd ./doc/build
+          git init
+          # git lfs install
+          # git lfs track "*.mp4"
+          # git lfs track "*.tar"
+          git config --global user.name 'UIF'
+          git config --global user.email 'UIF@uif.org'
+          git config --global init.defaultBranch 'master'
+          git add --all
+          git remote add origin https://${{ secrets.UIF_TOKEN }}@github.com/UIforFreedom/UIF_help.git
+          git commit -am "auto update"
+          git push origin master --force

@@ -1,0 +1,90 @@
+---
+sidebar_position: 2
+---
+
+# 用 Linux 脚本搭建 （推荐）
+
+请先确保你有属于自己的，并且能访问国外网站的 VPS 服务器。
+
+首先，需要使用 SSH 工具，连接上你的 VPS
+
+## 安装
+
+```bash
+wget -P /root -N "https://raw.githubusercontent.com/mack-a/v2ray-agent/master/install.sh" && chmod 700 /root/install.sh && /root/install.sh
+```
+
+建议使用 `Trojan` 或 `Vmess`，UIF 仅支持 `Trojan` 、`Vmess` 和 `ShadowSocks`的分享链接。
+
+## 导入 UIF
+
+复制脚本生成的分享链接，然后到 [我的订阅页面](https://uiforfreedom.github.io/#/out/subscribe)，点击 `添加订阅`，粘贴链接即可。
+
+<Tabs >
+<TabItem value="local" label="数据分享">
+
+通过分享原始的配置数据。优点就是方便简约要求不高，不需要可访问的服务器；缺点是每次更新都需重新复制粘贴，无法一键更新。
+
+
+<Tabs groupId="operating-systems">
+<TabItem value="android" label="安卓 Android">
+
+打开APP，新建订阅:
+
+import android1 from '../pics/m3.png';
+import android2 from '../pics/m4.png';
+import android3 from '../pics/m5.png';
+import android4 from '../pics/m6.png';
+import android5 from '../pics/m7.png';
+import android6 from '../pics/m8.png';
+import android7 from '../pics/m9.png';
+import android8 from '../pics/m10.png';
+import android9 from '../pics/m11.png';
+
+<img src={android1} width="400" height="400"/>
+<img src={android2} width="400" height="400"/>
+<img src={android3} width="400" height="400"/>
+<img src={android4} width="400" height="400"/>
+<img src={android5} width="400" height="400"/>
+<img src={android6} width="400" height="400"/>
+<img src={android7} width="400" height="400"/>
+<img src={android8} width="400" height="400"/>
+<img src={android9} width="400" height="400"/>
+
+再次使用时，无需再粘贴 `订阅内容` ，直接“启用”即可；除非`订阅内容`有更新，你需要再次复制粘贴到手机端。
+
+</TabItem>
+
+<TabItem value="ios" label="苹果 iPhone、iPad">
+
+到 `应用商店` 搜索 [sing-box](https://apps.apple.com/us/app/sing-box/id6451272673) 并安装即可。但请先确保你的登录的 Apple ID 的地区不属于中国大陆，否则将无法搜索出来。
+
+import ios1 from '../pics/ios/1.jpg';
+import ios2 from '../pics/ios/2.jpg';
+import ios3 from '../pics/ios/3-1.jpg';
+import ios4 from '../pics/ios/3-2.jpg';
+import ios5 from '../pics/ios/3-3.jpg';
+import ios6 from '../pics/ios/3-4.jpg';
+import ios7 from '../pics/ios/5.jpg';
+
+<img src={ios1} width="200" height="200"/>
+<img src={ios2} width="200" height="200"/>
+<img src={ios3} width="200" height="200"/>
+<img src={ios4} width="200" height="200"/>
+<img src={ios5} width="200" height="200"/>
+<img src={ios6} width="200" height="200"/>
+<img src={ios7} width="200" height="200"/>
+
+</TabItem>
+
+</Tabs>
+
+</TabItem>
+
+<TabItem value="remote" label="订阅链接（Remote）">
+
+你需要具有公网IP（VPS、开放端口的局域网），参考 。
+
+</TabItem>
+
+</Tabs>
