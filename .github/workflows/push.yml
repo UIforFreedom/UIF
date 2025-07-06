@@ -6,7 +6,7 @@ on:
 jobs:
   setup_env:
     name: Upload to github
-    if: "contains(github.event.head_commit.message, 'deploy')"
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'deploy')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
