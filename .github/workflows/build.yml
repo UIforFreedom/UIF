@@ -1,6 +1,8 @@
 name: Release
 
-on: [push]
+on:
+  push:
+  workflow_dispatch:
 jobs:
   build_uif:
     name: Build and Release
