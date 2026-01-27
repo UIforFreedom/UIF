@@ -1,0 +1,26 @@
+name: Test
+on: [push, pull_request]
+
+jobs:
+  setup_env:
+    name: test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    if: startsWith(github.ref, 'refs/tags/') && contains(github.event.head_commit.message, 'test')
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-go@v4
+      - uses: actions/setup-node@v3
+
+      - run: |
+          set NODE_OPTIONS=--openssl-legacy-provider
+          npm install --legacy-peer-deps
+          npm run test:unit
+
+      - run: |
+          cd ./uifd
+          go test ./uif -v

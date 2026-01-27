@@ -1,0 +1,16 @@
+[Unit]
+Description=uif service
+After=network.target nss-lookup.target
+
+[Service]
+ExecStart=/usr/bin/uif/uif
+ExecReload=/bin/kill -HUP $MAINPID
+ExecStop=/bin/kill -TERM $MAINPID
+Restart=on-failure
+RestartSec=10s
+KillMode=control-group
+TimeoutStopSec=15s
+LimitNOFILE=infinity
+
+[Install]
+WantedBy=multi-user.target
