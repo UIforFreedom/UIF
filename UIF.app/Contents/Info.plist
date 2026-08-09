@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+    <dict>
+        <key>CFBundleIconFile</key>
+        <string>uif</string>
+        <key>CFBundleIconName</key>
+        <string>uif</string>
+        <key>CFBundleExecutable</key>
+        <string>uif</string>
+        <key>CFBundleIdentifier</key>
+        <string>org.ui4freedom.uif</string>
+        <key>CFBundleName</key>
+        <string>UIF</string>
+        <key>CFBundleShortVersionString</key>
+        <string>1.0</string>
+        <key>CFBundleVersion</key>
+        <string>1.0.0</string>
+    </dict>
+</plist>

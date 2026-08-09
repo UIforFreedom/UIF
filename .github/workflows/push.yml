@@ -1,0 +1,39 @@
+name: Update Src
+on: [push]
+
+jobs:
+  setup_env:
+    name: Upload to github
+    if: "contains(github.event.head_commit.message, 'deploy')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      # 读取 version.txt 中的版本号
+      - name: Read version number
+        id: read_version
+        run: |
+          VERSION=$(cat ./uifd/version/uif.txt)
+          echo "Version: $VERSION"
+          echo "::set-output name=version::$VERSION"
+
+      # 替换 uif.iss 中的 {version} 为实际版本号
+      - name: Replace version in uif.iss
+        run: |
+          VERSION="${{ steps.read_version.outputs.version }}"
+          sed -i 's/0\.0\.1/'"$VERSION"'/g' ./uifd/uif.iss
+
+      - name: Git push
+        run: |
+          rm -r ./.git/
+          ls
+          git init
+          git config --global user.name 'UIF'
+          git config --global user.email 'UIF@uif.org'
+          git config --global init.defaultBranch 'master'
+          git add --all
+          git remote add origin https://${{ secrets.UIF_TOKEN }}@github.com/UIforFreedom/UIF.git
+          git commit -am "auto update"
+          git tag "v${{ steps.read_version.outputs.version }}"
+          git push origin "v${{ steps.read_version.outputs.version }}" --force
+          git push origin master --force

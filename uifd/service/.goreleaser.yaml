@@ -1,0 +1,23 @@
+project_name: uif_service
+builds:
+  - id: uif1
+    main: ./
+    env:
+      - CGO_ENABLED=0
+    targets:
+      - darwin_amd64_v1
+      - darwin_arm64
+      - linux_amd64_v1
+      - linux_arm64
+      - linux_arm_7
+      - linux_mipsle
+
+  - id: uif2
+    main: ./
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -H=windowsgui
+    targets:
+      - windows_amd64_v1
+      - windows_arm64
