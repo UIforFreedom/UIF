@@ -1,0 +1,8 @@
+{
+  "label": "下载安装",
+  "position": 1,
+  "link": {
+    "type": "generated-index",
+    "description": "在各种设备下载安装 UIF，支持 amd64（x64）、arm64 和 armv7 架构。"
+  }
+}

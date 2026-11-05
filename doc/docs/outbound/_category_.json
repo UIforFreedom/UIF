@@ -1,0 +1,8 @@
+{
+  "label": "节点搭建/分享",
+  "position": 4,
+  "link": {
+    "type": "generated-index",
+    "description": "本节介绍如何自己搭建代理服务器，并导入到本机UIF使用。"
+  }
+}

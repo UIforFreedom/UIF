@@ -1,0 +1,33 @@
+before:
+builds:
+  - env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+    flags:
+      - -trimpath
+    goos:
+      - linux
+      - windows
+      - darwin
+      - freebsd
+    goarch:
+      - 386
+      - amd64
+      - arm
+      - arm64
+      - mips
+      - mipsle
+      - mips64
+      - mips64le
+      - s390x
+    goarm:
+      - 5
+      - 6
+      - 7
+    gomips:
+      - softfloat
+archives:
+  - format: binary
+checksum:
+  name_template: "checksums.txt"
